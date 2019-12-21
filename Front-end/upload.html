@@ -1,0 +1,222 @@
+<html>
+<style>
+
+.button {
+	background-color: #4D80BB;
+	border: none;
+	color: white;
+	padding: 15px 32px;
+	text-align: center;
+	text-decoration: none;
+	display: inline-block;
+	font-size: 16px;
+	margin: 4px 650px;
+	cursor: pointer;
+}
+
+ul {
+	list-style-type: none;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+	background-color: #4D80BB;
+}
+
+li {
+	float: left;
+}
+
+li a {
+	display: block;
+	color: white;
+	text-align: center;
+	padding: 14px 16px;
+	text-decoration: none;
+}
+
+li a:hover {
+	background-color: #111;
+}
+
+#camera, #camera--view, #camera--sensor, #camera--output{
+	position: fixed;
+	height: 100%;
+	width: 100%:
+	object-fit: cover;
+}
+
+#camera--trigger{
+	width: 200px;
+	background-color: black;
+	color: white;
+	font-size: 16px;
+	border-radius: 30px;
+	border: none;
+	padding: 15px 20px;
+	text-align: center;
+	box-shadow: 0 5px 10px 0 rgba(0,0,0,0.2);
+	position: fixed;
+	bottom: 30px;
+	left: calc(50% - 100px);
+}
+
+.taken{
+	height: 100px!important;
+	width: 100px!important;
+	transition: all 0.5s ease-in;
+	border: solid 3px white;
+	box-shadow: 0 5px 10px 0 rgba(0,0,0,0.2);
+	top: 20px;
+	right: 20px;
+	z-index: 2;
+}
+</style>
+	
+
+<body>
+	<ul>
+		<li><a class="active" href="https://project-front-end-uswest2.s3-us-west-2.amazonaws.com/home.html">Home</a></li>
+		<!-- <li><a href="https://project-front-end-uswest2.s3-us-west-2.amazonaws.com/dashboard.html">Dashboard</a></li> -->
+		<li><a href="https://project-front-end-uswest2.s3-us-west-2.amazonaws.com/enrolled.html">Enrolled Students</a></li>
+		<li><a href="https://project-front-end-uswest2.s3-us-west-2.amazonaws.com/modifynew.html">Modify Attendance</a></li>
+	</ul>
+
+	<div class="row">
+		<div class="col-md-6">
+			<h2 align="center">Upload Photo</h2>
+		</div>
+		<br>
+		<br>
+
+
+		<div class="col-md-6">
+			<div class="input-group mb-3" >
+				<main id="camera">
+					<!-- Camera sensor -->
+					<canvas id="camera--sensor"></canvas>
+
+					<!-- Camera view -->
+					<video id="camera--view" autoplay playsinline></video>
+
+					<!-- Camera output -->
+					<img src="//:0" alt="" id="camera--output">
+					<!-- Camera trigger -->
+					<button id="camera--trigger">Take a picture</button>
+				</main>
+				<br>
+				<br>
+				<br>
+				<div class="input-group-btn">
+					<button class="button" type="submit">Upload</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1.12.min.js"></script>
+<script type="text/javascript" src="lib/axios/dist/axios.standalone.js"></script>
+<script type="text/javascript" src="lib/CryptoJS/rollups/hmac-sha256.js"></script>
+<script type="text/javascript" src="lib/CryptoJS/rollups/sha256.js"></script>
+<script type="text/javascript" src="lib/CryptoJS/components/hmac.js"></script>
+<script type="text/javascript" src="lib/CryptoJS/components/enc-base64.js"></script>
+<script type="text/javascript" src="lib/url-template/url-template.js"></script>
+<script type="text/javascript" src="lib/apiGatewayCore/sigV4Client.js"></script>
+<script type="text/javascript" src="lib/apiGatewayCore/apiGatewayClient.js"></script>
+<script type="text/javascript" src="lib/apiGatewayCore/simpleHttpClient.js"></script>
+<script type="text/javascript" src="lib/apiGatewayCore/utils.js"></script>
+<script type="text/javascript" src="apigClient.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+<script> 
+	var constraints = { video: { facingMode: "user" }, audio: false };
+	// Define constants
+	const cameraView = document.querySelector("#camera--view"),
+				cameraOutput = document.querySelector("#camera--output"),
+				cameraSensor = document.querySelector("#camera--sensor"),
+				cameraTrigger = document.querySelector("#camera--trigger")
+
+	function cameraStart() {
+		navigator.mediaDevices
+				.getUserMedia(constraints)
+				.then(function(stream) {
+					track = stream.getTracks()[0];
+					cameraView.srcObject = stream;
+		})
+		.catch(function(error) {
+				console.error("Oops! Something is broken.", error);
+		});
+	}
+
+	function getBase64(file) {
+		return new Promise((resolve, reject) => {
+				const reader = new FileReader();
+				reader.readAsDataURL(file);
+				// reader.onload = () => resolve(reader.result)
+				reader.onload = () => {
+					let encoded = reader.result.replace(/^data:(.*;base64,)?/, '');
+					if ((encoded.length % 4) > 0) {
+						encoded += '='.repeat(4 - (encoded.length % 4));
+					}
+					resolve(encoded);
+				};
+				reader.onerror = error => reject(error);
+		});
+	}
+
+	// Take a picture when cameraTrigger is tapped
+	cameraTrigger.onclick = function() {
+		var file="";
+		cameraSensor.width = cameraView.videoWidth;
+		cameraSensor.height = cameraView.videoHeight;
+		cameraSensor.getContext("2d").drawImage(cameraView, 0, 0);
+		cameraOutput.src = cameraSensor.toDataURL("image/jpeg");
+
+		cameraSensor.toBlob(function(blob) {
+			var timestamp = new Date().valueOf();
+			
+			file = new File([blob], timestamp+"MyImage.jpeg");
+
+			url = 'https://cors-anywhere.herokuapp.com/https://j4di38lc4f.execute-api.us-west-2.amazonaws.com/test/upload-image/project-back-end-uswest2/' + file.name
+
+			let config = {
+				headers: { 'Content-Type': "image/jpeg" }
+			};
+
+			console.log(file.type);
+
+			axios.put(url, file, config).then(response => {
+		 
+				alert("Image uploaded successfully!");
+
+			}).catch(function(error) {
+
+					console.error("Oops! Something is broken.", error);
+			}); 
+
+			// var encoded_image = getBase64(file).then(
+			//  data => {
+
+			//    //console.log(data)
+			//    var apigClient = apigClientFactory.newClient({});
+			//    var file_type = file.type + ";base64"
+			//    var body = data;
+			//    var params = {"key" : file.name, "bucket" : "project-back-end-uswest2", "Content-Type" : "image/jpeg"};
+			//    var additionalParams = {};
+
+			//    apigClient.uploadImageBucketKeyPut(params, body , additionalParams).then(function(res){
+			//     alert("uploaded!");
+			//    }).catch(function(result){
+			//     alert("Error!");
+			//    })
+			// });
+			
+			cameraOutput.classList.add("taken");
+			
+		}, "image/jpeg", 0.75);  
+	
+		
+	};
+	// Start the video stream when the window loads
+	window.addEventListener("load", cameraStart, false);
+</script>
+</html>
